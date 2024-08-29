@@ -1,0 +1,26 @@
+{% extends '/layouts/layout.html' %}
+
+{% block title %}Home - Auto Prep as a Service{% endblock %}
+
+{% block content %}
+    <h1 class="mt-4">Automated Data Analytics as a Service</h1>
+    <p>This is a simple application to use for data preprocessing</p>
+
+    <form id="file-form" action="/profile" method="POST" enctype="multipart/form-data">
+        <div class="form-group my-2">
+            <label for="fileInput">Choose file</label>
+            <input type="file" class="form-control-file" id="fileInput" name="file" accept=".csv">
+            <small class="form-text text-muted">Only csv and json files are allowed.</small>
+        </div>
+        <button class="btn btn-sm btn-primary" id="submit">Analyze</button>
+    </form>
+
+    <div class="mt-4 d-none" id="file-details">
+
+    </div>
+{% endblock %}
+
+<!-- JS Libs -->
+{% block js %}
+    <script src="{{ url_for('static', filename='js/custom.js') }}"></script>
+{% endblock js %}
