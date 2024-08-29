@@ -4,6 +4,7 @@ from flask import render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from app.src.profile.profile import Profile
 from app.src.gather.gather import Gather
+from app.src.eda.eda import Eda
 import os
 
 # Config
@@ -20,10 +21,14 @@ def index():
 def about():
     return render_template('about.html')
 
-# Profile
-@app.route('/profile', methods=['POST'])
-def profile():
+# Examples 
+@app.route('/examples')
+def example():
+    return render_template('example.html')
 
+# EDA
+@app.route('/eda', methods=['POST'])
+def eda():
     file_path = os.path.dirname(__file__) + '/' + app.config['upload_folder']
     file = request.files['file']
     filename = secure_filename(file.filename)
@@ -46,5 +51,8 @@ def profile():
     file_profile = Profile(df)
     profile = file_profile.df_profile(objective, 0.1)
 
-    return render_template('analyze.html', profile=profile)
+    # EDA
+    file_eda = Eda(df, profile)
+    eda = file_eda.df_describe()
 
+    return render_template('eda.html', eda=eda)
