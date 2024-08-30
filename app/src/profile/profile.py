@@ -4,12 +4,14 @@ import pandas as pd
 # Other Libs
 from visions.functional import detect_type
 from visions.typesets import StandardSet
-import visions
 
 # profile.py
 class Profile:
-    def __init__(self, df):
+    def __init__(self, df, problem_type, target_feature):
         self.df = df 
+        self.problem_type = problem_type
+        self.target_feature = target_feature
+
         self.typeset = StandardSet()
 
     # Features, Rows
@@ -58,13 +60,13 @@ class Profile:
             return 'input' 
         
     ## Feature Profiling  | {Feature, Objective, Unique Values Threshold}
-    def f_profile(self, f, f_objective, unique_values_thres):
+    def f_profile(self, f, unique_values_thres):
         
         # Data Type
         data_type = self.f_data_type(f)
 
         # Role
-        role = self.f_role(f, f_objective['target_feature'])
+        role = self.f_role(f, self.target_feature)
 
         # Unique Values Ration
         unique_values = len(f.value_counts()) 
@@ -81,22 +83,19 @@ class Profile:
         }
 
     ## All feature profiling
-    def df_profile(self, df_objective, unique_values_ratio):
+    def df_profile(self, unique_values_ratio):
         df_profile = {}
-
-        # Name
-        df_profile['name'] = 'Titanic'
 
         # Dataset
         df_profile['dataset'] = self.df_shape()
 
         # Target Feature
-        df_profile['target_feature'] = df_objective['target_feature']
+        df_profile['target_feature'] = self.target_feature
 
         # Features
         df_features = {}
         for f in self.df.columns: 
-            df_features[f] = self.f_profile(self.df[f], df_objective, unique_values_ratio)
+            df_features[f] = self.f_profile(self.df[f], unique_values_ratio)
         df_profile['features'] = df_features
 
         return df_profile 
