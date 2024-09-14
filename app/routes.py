@@ -2,10 +2,10 @@
 from app import app, db
 from flask import render_template, request, jsonify, Blueprint
 from werkzeug.utils import secure_filename
-from app.src.profile.profile import Profile
+from app.src.prof.profile import Profile
 from app.src.gather.gather import Gather
 from app.src.eda.eda import Eda
-from app.utils import generate_unique_filename
+from app.utils import generate_unique_filename, delete_all_files
 
 # Models
 from app.models import UserCase
@@ -19,6 +19,11 @@ bp = Blueprint('main', __name__)
 # Index
 @bp.route('/')
 def index():
+
+    # Delete Files
+    file_path = os.path.dirname(__file__) + '/' + app.config['upload_folder']
+    delete_all_files(file_path)
+
     return render_template('index.html')
 
 # About 
@@ -77,7 +82,7 @@ def eda():
 
     # Profile
     file_profile = Profile(df, user_case_instance.problem_type, user_case_instance.target_feature)
-    profile = file_profile.df_profile(0.9)
+    profile = file_profile.df_profile(0.1)
 
     # EDA
     file_eda = Eda(df, profile)

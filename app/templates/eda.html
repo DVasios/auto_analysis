@@ -4,7 +4,7 @@
 
 {% block content %}
 
-    <h1 class="mt-4">Exploratory Data Analysis - {{ eda.name }}</h1>
+    <h1 class="mt-4">Exploratory Data Analysis</h1>
 
     <h2 class="mt-4">Dataset Characteristics</h1>
 
@@ -60,7 +60,7 @@
 
                         <h5 class="mt-2">Statistics</h5>
 
-                        {% if details.feature_type == 'Numerical' and details.role != 'id' %}
+                        {% if details.feature_type == 'Numerical' %}
                             <div>
                                 <span class="fw-bold">Count: </span>
                                 <span class="">{{ details.eda.statistics.count }}</span>
@@ -84,7 +84,8 @@
                         {% elif details.feature_type == 'Categorical' %}
                             <div>
                                 <span class="fw-bold">Categories: </span>
-                                {% for key, cat in details.eda.statistics.items() %}
+                                {% set keys = details.eda.statistics.keys()|list %}
+                                {% for key in keys[:10] %}
                                     <span class="">{{ key }}, </span>
                                 {% endfor %}
                             </div>
