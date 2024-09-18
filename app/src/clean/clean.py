@@ -7,33 +7,6 @@ import os
 
 # Sk learn 
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import GridSearchCV
-
-# Plotting
-import seaborn as sns
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-
-# Helpers
-import ijson
-import random
-from datetime import datetime
-
-# Visions | Data Type Detection
-from visions.functional import detect_type
-from visions.typesets import StandardSet
-import visions
-
 # Warnings
 import warnings
 
@@ -81,21 +54,6 @@ class Clean:
                 self.train = self.train.drop(columns=[f])
                 self.test = self.test.drop(columns=[f])
 
-                # Log
-                # print(f"Dropped: {f}")
-        
-        # Drop IDs
-        # columns = []
-        # for f, details in self.profile['features'].items():
-        #     if (details['role'] == 'id'):
-        #         columns.append(f)
-
-        #         # Log
-        #         # print(f"Dropped: {f}")
-
-        # self.train = self.train.drop(columns=columns)
-        # self.test = self.test.drop(columns=columns)
-
     # Data Imputation | {Dataframe, Profile, EDA}
     def impute(self, num_type):
 
@@ -111,9 +69,6 @@ class Clean:
             if (p['eda']['missing_data']['missing_values'] > 0.0):
                 if (p['feature_type'] == 'Numerical'):
                     numerical_columns.append(f)
-
-                    # Log
-                    # print(f"Imputed: {f}")
 
                 elif (p['feature_type'] == 'Categorical'):
                     categorical_columns.append(f)
@@ -175,8 +130,8 @@ class Clean:
             self.train = self.train[~outliers_train]
 
             # Test
-            outliers_test = ((self.test[f] < (Q1 - iqr_thres * IQR)) | (self.test[f] > (Q3 + iqr_thres * IQR)))
-            self.test = self.test[~outliers_test]
+            # outliers_test = ((self.test[f] < (Q1 - iqr_thres * IQR)) | (self.test[f] > (Q3 + iqr_thres * IQR)))
+            # self.test = self.test[~outliers_test]
 
     # Dataframe Clean | {Dataframe, Description, MV Thres, Outlier Thres, Unique Value Thres}
     def clean (self, profile_params):
@@ -191,12 +146,13 @@ class Clean:
         profile = Profile(self.train, self.profile['target_feature'], profile_params)
         self.profile = profile.df_profile()
 
-        # Data Imputation | 0.5 %
+        # Data Imputation 
         self.impute(self.params['num_type'])
 
         ## Describe
         profile = Profile(self.train, self.profile['target_feature'], profile_params)
         self.profile = profile.df_profile()
 
-        # Drop Outliers | 1.5
-        self.handle_outliers(self.params['outlier_thres'])
+        # Drop Outliers 
+        if (self.params['outlier_thres'] != 'none'):
+            self.handle_outliers(self.params['outlier_thres'])

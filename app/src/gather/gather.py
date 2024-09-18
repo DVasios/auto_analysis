@@ -2,13 +2,15 @@
 import os
 import pandas as pd
 import numpy as np
+from scipy.io import arff
 
 # Other
 import ijson
 
 class Gather:
-    def __init__(self, filepath):
+    def __init__(self, filepath, target):
         self.filepath = filepath 
+        self.target = target
 
     # File Characteristics
     def _descr (self): 
@@ -40,6 +42,16 @@ class Gather:
 
             # Check whether there is a header | TODO
             return pd.read_csv(self.filepath, nrows=nrows)
+        
+        # Arff
+        elif (file_descr['FileType'] == '.arff'):
+            data = arff.loadarff(self.filepath)
+            df = pd.DataFrame(data[0])
+            for i in df.columns:
+                if (df[i].dtype.name == 'object'):
+                    df[i] = df[i].apply(lambda x: int(x.decode('utf-8')))
+            return df
+
         else: 
             return False
         

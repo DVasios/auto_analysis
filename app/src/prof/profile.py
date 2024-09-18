@@ -31,17 +31,20 @@ class Profile:
 
     ## Features Characteristics
 
-    # Data Type | Standard Set | Integer,  Float, Boolean, Categorical, Complex, DateTime, Object, String
+    # Data Type | Standard Set | Integer,  Float, Boolean, DateTime, String
     def data_type(self, f):
 
         typeset = StandardSet()
         return str(typeset.infer_type(f.astype(str)))
 
     # Feature Type | Categorical, Numerical, Alphanumerical | {Data Type, Unique values Ratio, Thres}
-    def feature_type(self, data_type, unique_values_ratio, thres = 0.1): 
-        if ((data_type == 'String' or 
-            data_type == 'Integer' or 
-            data_type == 'Boolean') and unique_values_ratio < thres):
+    def feature_type(self, f, data_type): 
+
+        # Unique Values Ratio
+        unique_values = len(f.value_counts()) 
+        unique_values_ratio = unique_values / f.count()
+
+        if ((f.dtype.name == 'object') and unique_values_ratio < self.params['cat_thres']):
             return 'Categorical'
         elif (data_type == 'Integer' or data_type == 'Float'):
             return 'Numerical'
@@ -54,7 +57,7 @@ class Profile:
         f_unique_values = len(f.unique())
         f_total_values = len(f)
 
-        if ((data_type != 'Float') and f_total_values > 0 and (f_unique_values / f_total_values)) > self.params['id_thres']: 
+        if ((data_type != 'Float' and data_type != 'Integer') and f_total_values > 0 and (f_unique_values / f_total_values)) > self.params['id_thres']: 
             return 'id'
         elif (f.name == self.target): 
             return 'target'
@@ -70,17 +73,12 @@ class Profile:
         # Role
         role = self.role(f, data_type)
 
-        # Unique Values Ratio
-        unique_values = len(f.value_counts()) 
-        unique_values_ratio = unique_values / f.count()
-
         # Feature Type
-        feature_type = self.feature_type(data_type, unique_values_ratio, self.params['unique_values_thres'])
+        feature_type = self.feature_type(f, data_type)
 
         return {
             'data_type' : data_type,
             'role' : role,
-            'unique_values' : unique_values,
             'feature_type' : feature_type
         }
         
@@ -121,6 +119,8 @@ class Profile:
         # Empty Values 
         empty_values = f.isin(['']).sum()
 
+        # Zero Values
+
         # Missing Values
         missing_values = null_values + empty_values
 
@@ -142,34 +142,6 @@ class Profile:
         f_univariate['missing_data'] = self.missing_data(f)
 
         return f_univariate
-
-    
-    ## Features Bivariate
-
-    # Correlation Analysis | Each feature with target variable
-    def f_corr (self, f, corr_matrix):
-        if f in corr_matrix:
-            return round(corr_matrix[f], 2)
-        else:
-            return ''
-        
-    # # Bivariate Analysis | Dataframe
-    # def df_bivariate(self):
-
-    #     # Check if target feature is in String format | Label Encoding
-    #     if (df_prof['features'][self.target]['data_type'] == 'String'):
-
-    #         label_encoder = LabelEncoder()
-    #         df[df_prof['target_feature']] = label_encoder.fit_transform(df[df_prof['target_feature']])
-
-    #     df_bivariate = {}
-
-    #     # Correlation Analysis
-    #     corr_matrix = df.corr(numeric_only=True)[df_prof['target_feature']]
-    #     for f in df_prof['features']:
-    #         df_bivariate[f] = f_corr(f, corr_matrix)
-        
-    #     return df_bivariate
 
     ## All feature profiling
     def df_profile(self):

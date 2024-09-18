@@ -2,11 +2,13 @@
 
 # Core Libraries
 import numpy as np
+import pandas as pd
 
 # Sk learn 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_val_score
 from sklearn.svm import SVC
@@ -17,6 +19,8 @@ from sklearn.metrics import f1_score
 
 from skopt.space import Real, Categorical, Integer
 from skopt import gp_minimize
+
+from xgboost import XGBClassifier 
 
 # Helpers
 import random
@@ -47,6 +51,9 @@ class Automate:
 
     df_egineered = None
     df_egineered_profile = None
+
+    # Other
+    iter = 1
 
     def __init__(self, auto_params):
         self.auto_params = auto_params
@@ -79,7 +86,7 @@ class Automate:
         engineer.engineer(params['profile'])
 
         # Describe | Feature Engineered
-        prof = Profile(clean.get_train, self.auto_params['target'], params['profile'])
+        prof = Profile(engineer.get_train, self.auto_params['target'], params['profile'])
         engineered_profile = prof.df_profile()
 
         ## Save
@@ -89,68 +96,46 @@ class Automate:
         return engineer.train, engineer.test
 
     # Model 
-    def train_model(self, params):
+    def train_model(self, m):
 
         # Labels
         y_train = self.X_train_preprocessed[self.auto_params['target']]
         y_test = self.X_test_preprocessed[self.auto_params['target']]
+
+        # Transform Labels if they are strings
+        if (y_train.dtype.name == 'object'):
+            label_encoder = LabelEncoder()
+            label_encoder.fit(y_train)
+
+            # Transform both train and test sets using the same encoder
+            y_train = pd.DataFrame(label_encoder.transform(y_train))
+            y_test = pd.DataFrame(label_encoder.transform(y_test))
 
         # Drop Targets
         x_train = self.X_train_preprocessed.drop(columns=[self.auto_params['target']])
         x_test = self.X_test_preprocessed.drop(columns=[self.auto_params['target']])
 
         # Model
-        if (params['model'] == 'lg'):
-        
-            # Define the parameter grid
-            param_grid = {
-                'n_estimators': [50, 100],
-                'max_depth': [None, 10],
-                'min_samples_split': [2, 5, 10],
-            }
-
+        if (m == 'lg'):
             model = RandomForestClassifier(random_state=42)
-            # grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
         
-        elif (params['model'] == 'rf'):
-
-            param_grid = {
-                'C': [0.01, 0.1, 1, 10, 100],
-                'penalty': ['l1', 'l2'],
-                'solver': ['liblinear', 'saga'],
-                'max_iter': [100, 200, 300]
-            }
-
+        elif (m == 'rf'):
             model = LogisticRegression(random_state=42)
 
-        elif(params['model'] == 'svm'):
+        elif(m == 'xgb'):
+            model = XGBClassifier(use_label_encoder=False, eval_metric='mlogloss')
 
-            model = SVC(kernel='linear', C=1.0)
-            # grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-
-
+        # Scores
         scores = cross_val_score(model, x_train, y_train, cv=5)
-        print(scores.mean())
 
         # Fit data to model
         model_fitted = model.fit(x_train, y_train)
-
-        # Best Model
-        # best_model = grid_search.best_estimator_
 
         # Predict 
         y_pred = model_fitted.predict(x_test)
 
         # Evaluate
         accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred)
-        recall = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-
-        print(f"accuracy: {accuracy}")
-        print(f"precision: {precision}")
-        print(f"recall: {recall}")
-        print(f"f1: {f1}")
 
         return accuracy
 
@@ -161,7 +146,7 @@ class Automate:
 
             # Params
             profile_params = {
-                'unique_values_thres' : params[0],
+                'cat_thres' : params[0],
                 'id_thres' : 0.9
             }               
 
@@ -176,15 +161,9 @@ class Automate:
             engineering_params = {
                 'freq_thres' : params[4],
                 'encode_type' : params[5],
-                'scale' : params[6],
-                'scale_type' : params[7],
-                'select' : params[8],
-                'select_type' : params[9]
-            }
-
-            # Models Parameters
-            model_params = {
-                'model' : params[10] 
+                'scale_type' : params[6],
+                'select_type' : params[7],
+                'select_perc' : params[8]
             }
 
             ## Params
@@ -192,20 +171,30 @@ class Automate:
                 'profile' : profile_params,
                 'clean' : clean_params,
                 'engineering' : engineering_params,
-                'model' : model_params
             }
 
         # Preprocess
         self.X_train_preprocessed, self.X_test_preprocessed = self.preprocess(params)
 
         # Train model
-        accuracy = self.train_model(params['model'])
+        if (self.auto_params['model'] == 'ensemble'):
+            lg_acc = self.train_model('lg')
+            rf_acc = self.train_model('rf')
+            xgb_acc = self.train_model('xgb')
+            accuracy =  round((lg_acc + rf_acc + xgb_acc) / 3, 4)
+        else:
+            accuracy = round(self.train_model(self.auto_params['model']), 4)
+
+
+        # Log
+        print(f"\rIteration: {self.iter}/{self.auto_params['n_iter']}", end="")
+        # print(f"\rAccuracy: {accuracy}", end="")
+        self.iter += 1
 
         if (self.auto_params['opt_method'] == 'random'):
             return accuracy
         elif(self.auto_params['opt_method'] == 'bayesian'):
             return 1-accuracy
-
 
     # Optimization Method
     def random_search(self, n_iter):
@@ -214,11 +203,13 @@ class Automate:
         best_params = None
 
         accuracies = []
+        opt_accuracies = []
+    
         for i in range(n_iter):
 
             # Params
             profile_params = {
-                'unique_values_thres' : random.choice([0.1, 0.15, 0.2]),
+                'cat_thres' : random.choice([0.1, 0.15, 0.2]),
                 'id_thres' : 0.9
             }
 
@@ -233,15 +224,9 @@ class Automate:
             engineering_params = {
                 'freq_thres' : random.uniform(0.05, 0.15),
                 'encode_type' : random.choice(['one-hot', 'label']),
-                'scale' : random.choice([True, False]),
-                'scale_type' : random.choice(['std', 'min-max', 'robust']),
-                'select' : random.choice([True, False]),
-                'select_type' : random.choice(['variance_thres', 'PCA', 'univariate'])
-            }
-
-            # Models Parameters
-            model_params = {
-                'model' : random.choice(['lg', 'rf', 'svm'])
+                'scale_type' : random.choice(['none', 'std', 'min-max', 'robust']),
+                'select_type' : random.choice(['none', 'variance_thres', 'univariate', 'mi']),
+                'select_perc' : random.choice([0.4, 0.6, 0.8])
             }
 
             ## Params
@@ -249,10 +234,7 @@ class Automate:
                 'profile' : profile_params,
                 'clean' : clean_params,
                 'engineering' : engineering_params,
-                'model' : model_params
             }
-
-            print(params)
 
             # Evaluate the model with the sampled parameters
             accuracy = self.objective(params)
@@ -263,34 +245,29 @@ class Automate:
             # Check if this is the best score so far
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
-                best_params = (params, model_params)
+                best_params = [ profile_params['cat_thres'], profile_params['id_thres'], clean_params['drop_thres'], clean_params['outlier_thres'], clean_params['num_type'], engineering_params['freq_thres'], engineering_params['encode_type'], engineering_params['scale_type'], engineering_params['selection_type']]
 
-            print(f"Iteration: {i+1}, Accuracy: {accuracy}" )
-           
-        
-        return best_params, best_accuracy, accuracies
+            opt_accuracies.append(best_accuracy)
+
+        return best_params, best_accuracy, accuracies, opt_accuracies
     
     def bayesian(self, n_iter):
 
         search_space = [
-            Categorical([0.1, 0.15, 0.2], name='unique_values_thres'),
-            Categorical([0.5, 0.6, 0.7], name='drop_thres'),
-            Categorical([1.5, 2, 3, 4], name='outlier_thres'),
+            Real(0.1, 0.3, name='cat_thres'),
+            Real(0.4, 0.7, name='drop_thres'),
+            Categorical(['none', 1,  1.5, 2, 3], name='outlier_thres'),
             Categorical(['mean', 'median'], name='num_team'),
             Real(0.05, 0.15, name='freq_thres'),
             Categorical(['one-hot', 'label'], name='encode_type'),
-            Categorical([True, False], name='scale'),
-            Categorical(['std', 'min-max', 'robust'], name='scale_type'),
-            Categorical([True, False], name='select'),
-            Categorical(['variance_thres', 'PCA', 'univariate'], name='select_type'),
-            Categorical(['lg', 'rf', 'svm'], name='model'),
+            Categorical(['none', 'std', 'min-max', 'robust'], name='scale_type'),
+            Categorical(['none', 'variance_thres', 'univariate', 'mi'], name='select_type'),
+            Categorical([0.4, 0.5, 0.75, 1], name='select_perc'),
         ]
 
-
-        result = gp_minimize(self.objective, search_space, n_calls=n_iter, random_state=42)
+        result = gp_minimize(self.objective, search_space, n_initial_points=10, n_calls=n_iter, n_jobs=-1)
 
         return result
-
 
     # Optimize  
     def optimize(self):
@@ -300,13 +277,13 @@ class Automate:
         
         elif (self.auto_params['opt_method'] == 'bayesian'):
             res = self.bayesian(self.auto_params['n_iter'])
-            return 1 - res.fun, res.x
+            return res
 
     # Automated Data Preprocessing | {File Source, Problem Type, Target}
     def auto_preproc (self):
 
         # Gather Data from source file
-        gather = Gather(self.auto_params['filepath'])
+        gather = Gather(self.auto_params['filepath'], self.auto_params['target'])
         df = gather.gather()
 
         # Split Train, Test
@@ -315,5 +292,13 @@ class Automate:
         # Run Optimization Method
         result = self.optimize()
 
-        return resultp
+        return result
+    
+    # Print Report
+    def report(self):
+        print('hi')
+
+    # Extract Results
+    def extract(self):
+        print('extract')
     

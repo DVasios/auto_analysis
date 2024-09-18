@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.decomposition import PCA
+from sklearn.feature_selection import mutual_info_classif
 
 # App Libs
 from prof.profile import Profile
@@ -144,15 +144,18 @@ class Engineering:
 
                     encoded = True
 
-
                 # Categorical | label
                 elif (details['feature_type'] == 'Categorical' and self.params['encode_type'] == 'label'):
 
-                    # Train
-                    encoder = LabelEncoder()
-                    f_encoded_train = pd.DataFrame(encoder.fit_transform(f_set_train))
+                    # Combine train and test sets to fit the encoder on all categories
+                    combined_set = pd.concat([f_set_train, f_set_test])
 
-                    # Test 
+                    # Fit the encoder on the combined set
+                    encoder = LabelEncoder()
+                    encoder.fit(combined_set)
+
+                    # Transform both train and test sets using the same encoder
+                    f_encoded_train = pd.DataFrame(encoder.transform(f_set_train))
                     f_encoded_test = pd.DataFrame(encoder.transform(f_set_test))
 
                     encoded = True
@@ -242,8 +245,10 @@ class Engineering:
         
         elif(self.params['select_type'] == 'univariate'):
 
+            k = int(len(self.train.columns) * self.params['select_perc'])
+
             # Select K Best
-            selector = SelectKBest(score_func=f_classif, k=10)
+            selector = SelectKBest(score_func=f_classif, k=k)
 
             # 
             selected_train =  selector.fit_transform(x_train, y_train)
@@ -258,26 +263,24 @@ class Engineering:
             self.train = pd.concat([self.train, y_train], axis=1, ignore_index=False)
             self.test = pd.concat([self.test, y_test], axis=1, ignore_index=False)
 
-        elif(self.params['select_type'] == 'PCA'):
+        elif(self.params['select_type'] == 'mi'):
+            k = int(len(self.train.columns) * self.params['select_perc'])
 
-            # PCA
-            selector = PCA(n_components=5)
+            selector = SelectKBest(score_func=mutual_info_classif, k=k) 
 
-            # 
-            selected_train =  selector.fit_transform(x_train)
+            selected_train =  selector.fit_transform(x_train, y_train)
             selected_test =  selector.transform(x_test)
 
-            # Convert to DF
-            pca_columns = [f'PC{i+1}' for i in range(selected_train.shape[1])]
-            self.train = pd.DataFrame(selected_train, columns=pca_columns, index=x_train.index)
-            self.test = pd.DataFrame(selected_test, columns=pca_columns, index=x_test.index)
+            # Get the selected feature indices
+            selected_features = x_train.columns[selector.get_support()]
 
-            # Concatenate
-            self.train = pd.concat([self.train, y_train], axis=1, ignore_index=False)
-            self.test = pd.concat([self.test, y_test], axis=1, ignore_index=False)
- 
+            # Convert to DataFrame
+            self.train = pd.DataFrame(selected_train, columns=selected_features, index=x_train.index)
+            self.test = pd.DataFrame(selected_test, columns=selected_features, index=x_test.index)
 
-    ## Feature Generation
+            # Concatenate with the target variable
+            self.train = pd.concat([self.train, y_train], axis=1)
+            self.test = pd.concat([self.test, y_test], axis=1)
 
     # Feature Engineering | {Dataframe, Profile, EDA}
     def engineer(self, profile_params): 
@@ -297,9 +300,9 @@ class Engineering:
         self.encode()
 
         # Feature Scaling
-        if (self.params['scale']):
+        if (self.params['scale_type'] != 'none'):
             self.scale()
 
         # Feature Select
-        if (self.params['select']):
+        if (self.params['select_type'] != 'none'):
             self.select()
