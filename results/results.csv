@@ -1,0 +1,2 @@
+Dataset,Features,Rows,MissingData,Duplicates,BestAccuracy,TimeRunning,Iteration,OutlierThres,ImputationType,EncodingType,ScaleType,SelectionType,SelectionPercentage
+data/bank/bank.csv,17,8929,False,False,0.8097,1 minutes and 29 seconds,none,Median,One-Hot,None,Variance_Thres,0.75
