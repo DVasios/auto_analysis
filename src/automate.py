@@ -67,51 +67,51 @@ class Automate:
     best_acc = None
 
     def __init__(self, auto_params):
-        self.auto_params = auto_params
+        self.__auto_params = auto_params
 
     # Preprocess
-    def preprocess(self, params):
+    def __preprocess(self, params):
 
         # Profile
-        prof = Profile(self.X_train, self.auto_params['target'], params['profile'])
-        profile = prof.df_profile()
+        prof = Profile(self.X_train, self.__auto_params['target'], params['profile'])
+        profile = prof.data_profile()
         
         ## Save
         self.df = self.X_train
         self.df_profile = profile
 
         # Clean
-        clean = Clean(self.X_train, self.X_test, profile, params['clean'])
-        clean.clean(params['profile'])
+        clean = Clean(self.X_train, self.X_test, self.__auto_params['target'], params)
+        clean.clean()
 
         # Cleaned Profile
-        prof = Profile(clean.get_train, self.auto_params['target'], params['profile'])
-        cleaned_profile = prof.df_profile()
+        prof = Profile(clean.get_train, self.__auto_params['target'], params['profile'])
+        cleaned_profile = prof.data_profile()
 
         ## Save
         self.df_cleaned = clean.get_train
         self.df_cleaned_profile = cleaned_profile
 
         # Feature Engineer
-        engineer = Engineer(clean.get_train, clean.get_test, cleaned_profile, self.auto_params['target'], params['engineering'])
-        engineer.engineer(params['profile'])
+        engineer = Engineer(clean.get_train, clean.get_test, self.__auto_params['target'], params)
+        engineer.engineer()
 
         # Describe | Feature Engineered
-        prof = Profile(engineer.get_train, self.auto_params['target'], params['profile'])
-        engineered_profile = prof.df_profile()
+        prof = Profile(engineer.get_train, self.__auto_params['target'], params['profile'])
+        engineered_profile = prof.data_profile()
 
         ## Save
         self.df_engineered = engineer.get_train
         self.df_engineered_profile = engineered_profile
 
-        return engineer.train, engineer.test
+        return engineer.get_train, engineer.get_test
 
     # Model 
-    def train_model(self, m):
+    def __train_model(self, m):
 
         # Labels
-        y_train = self.X_train_preprocessed[self.auto_params['target']]
-        y_test = self.X_test_preprocessed[self.auto_params['target']]
+        y_train = self.X_train_preprocessed[self.__auto_params['target']]
+        y_test = self.X_test_preprocessed[self.__auto_params['target']]
 
         # Transform Labels if they are strings
         if (y_train.dtype.name == 'object'):
@@ -123,8 +123,8 @@ class Automate:
             y_test = pd.DataFrame(label_encoder.transform(y_test))
 
         # Drop Targets
-        x_train = self.X_train_preprocessed.drop(columns=[self.auto_params['target']])
-        x_test = self.X_test_preprocessed.drop(columns=[self.auto_params['target']])
+        x_train = self.X_train_preprocessed.drop(columns=[self.__auto_params['target']])
+        x_test = self.X_test_preprocessed.drop(columns=[self.__auto_params['target']])
 
         # Model
         if (m == 'lg'):
@@ -165,9 +165,9 @@ class Automate:
         return accuracy
 
     # Objective
-    def objective(self, params):
+    def __objective(self, params):
 
-        if (self.auto_params['opt_method'] == 'bayesian'):
+        if (self.__auto_params['opt_method'] == 'bayesian'):
 
             # Params
             profile_params = {
@@ -195,15 +195,15 @@ class Automate:
             params = {
                 'profile' : profile_params,
                 'clean' : clean_params,
-                'engineering' : engineering_params,
+                'engineer' : engineering_params,
             }
 
         # Preprocess
-        self.X_train_preprocessed, self.X_test_preprocessed = self.preprocess(params)
+        self.X_train_preprocessed, self.X_test_preprocessed = self.__preprocess(params)
 
         # Train model
-        accuracy = round(self.train_model(self.auto_params['model']), 4)
-        if(self.auto_params['opt_method'] == 'bayesian'):
+        accuracy = round(self.__train_model(self.__auto_params['model']), 4)
+        if(self.__auto_params['opt_method'] == 'bayesian'):
             accuracy = 1 - accuracy
 
         # Current Accuracy
@@ -212,13 +212,13 @@ class Automate:
             self.X_test_preprocessed_best = self.X_test_preprocessed
 
         # Log
-        print(f"\rIteration: {self.iter}/{self.auto_params['n_iter']}", end="")
+        print(f"\rIteration: {self.iter}/{self.__auto_params['n_iter']}", end="")
         self.iter += 1
            
         return accuracy
 
     # Optimization Method
-    def random_search(self, n_iter):
+    def __random_search(self, n_iter):
 
         best_accuracy = -np.inf
         best_params = None
@@ -254,11 +254,11 @@ class Automate:
             params = {
                 'profile' : profile_params,
                 'clean' : clean_params,
-                'engineering' : engineering_params,
+                'engineer' : engineering_params,
             }
 
             # Evaluate the model with the sampled parameters
-            accuracy = self.objective(params)
+            accuracy = self.__objective(params)
 
             # Push Accuracy
             accuracies.append(accuracy)
@@ -280,7 +280,7 @@ class Automate:
 
         return best_params, best_accuracy, accuracies, opt_accuracies
     
-    def bayesian(self, n_iter):
+    def __bayesian(self, n_iter):
 
         search_space = [
             Real(0.1, 0.3, name='cat_thres'),
@@ -294,21 +294,21 @@ class Automate:
             Categorical([0.4, 0.5, 0.75, 1], name='select_perc'),
         ]
 
-        result = gp_minimize(self.objective, search_space, n_initial_points=10, n_calls=n_iter, n_jobs=-1)
+        result = gp_minimize(self.__objective, search_space, n_initial_points=10, n_calls=n_iter, n_jobs=-1)
 
         return result
 
     # Optimize  
-    def optimize(self):
+    def __optimize(self):
 
         # Initialize Variables
         self.best_acc = 0
 
-        if (self.auto_params['opt_method'] == 'random'):
-            return self.random_search(self.auto_params['n_iter'])
+        if (self.__auto_params['opt_method'] == 'random'):
+            return self.__random_search(self.__auto_params['n_iter'])
         
-        elif (self.auto_params['opt_method'] == 'bayesian'):
-            res = self.bayesian(self.auto_params['n_iter'])
+        elif (self.__auto_params['opt_method'] == 'bayesian'):
+            res = self.__bayesian(self.__auto_params['n_iter'])
             return res
 
     # Automated Data Preprocessing | {File Source, Problem Type, Target}
@@ -318,14 +318,14 @@ class Automate:
         start_time = time.time()
 
         # Gather Data from source file
-        gather = Gather(self.auto_params['filepath'], self.auto_params['target'])
+        gather = Gather(self.__auto_params['filepath'])
         df = gather.gather()
 
         # Split Train, Test
         self.X_train, self.X_test = train_test_split(df, test_size=0.2, random_state=42)
 
         # Run Optimization Method
-        result = self.optimize()
+        result = self.__optimize()
 
         ## End Time
         end_time = time.time()
@@ -348,8 +348,8 @@ class Automate:
     def hp_optization(self, n_iter):
 
         # Labels
-        y_train = self.X_train_preprocessed_best[self.auto_params['target']]
-        y_test = self.X_test_preprocessed_best[self.auto_params['target']]
+        y_train = self.X_train_preprocessed_best[self.__auto_params['target']]
+        y_test = self.X_test_preprocessed_best[self.__auto_params['target']]
 
         # Transform Labels if they are strings
         if (y_train.dtype.name == 'object'):
@@ -361,8 +361,8 @@ class Automate:
             y_test = pd.DataFrame(label_encoder.transform(y_test))
 
         # Drop Targets
-        x_train = self.X_train_preprocessed_best.drop(columns=[self.auto_params['target']])
-        x_test = self.X_test_preprocessed_best.drop(columns=[self.auto_params['target']])
+        x_train = self.X_train_preprocessed_best.drop(columns=[self.__auto_params['target']])
+        x_test = self.X_test_preprocessed_best.drop(columns=[self.__auto_params['target']])
 
         # Define the model
         xgb_model = XGBClassifier()
@@ -395,7 +395,7 @@ class Automate:
 
     # Print Report
     def report(self):
-        if (self.auto_params['opt_method'] == 'bayesian'):
+        if (self.__auto_params['opt_method'] == 'bayesian'):
             acc = 1 - self.result['fun']
             pip = self.result['x']
         else:
@@ -446,7 +446,7 @@ class Automate:
     # Convergence
     def plot(self):
 
-        if (self.auto_params['opt_method'] == 'bayesian'):
+        if (self.__auto_params['opt_method'] == 'bayesian'):
 
             plot_convergence(self.result)
         else:
@@ -454,7 +454,7 @@ class Automate:
 
     # Extract Results
     def save(self, filepath):
-        if (self.auto_params['opt_method'] == 'bayesian'):
+        if (self.__auto_params['opt_method'] == 'bayesian'):
             acc = 1 - self.result['fun']
             pip = self.result['x']
         else:
@@ -463,14 +463,14 @@ class Automate:
 
         # Data
         data = [
-            [self.auto_params['filepath'], 
+            [self.__auto_params['filepath'], 
              self.df_profile['dataset']['features'],
              self.df_profile['dataset']['rows'],
              has_missing_data(self.df_profile),
              self.df_profile['dataset']['duplicates']['exist'],
              round(acc, 4),
              self.run_time,
-             self.auto_params['n_iter'],
+             self.__auto_params['n_iter'],
              pip[2],
              pip[3].title(),
              pip[5].title(),

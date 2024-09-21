@@ -1,33 +1,31 @@
 # Basic
 import os
 import pandas as pd
-import numpy as np
 from scipy.io import arff
 
 # Other
 import ijson
 
 class Gather:
-    def __init__(self, filepath, target):
-        self.filepath = filepath 
-        self.target = target
+    def __init__(self, filepath):
+        self.__filepath = filepath 
 
     # File Characteristics
-    def _descr (self): 
+    def __descr (self): 
         descr = {
-            'FileType': os.path.splitext(self.filepath)[1],
-            'FileSize': os.path.getsize(self.filepath),
+            'FileType': os.path.splitext(self.__filepath)[1],
+            'FileSize': os.path.getsize(self.__filepath),
         }
         return descr
 
     # Converters | File type to Dataframe
-    def _convert (self, file_descr, nrows = 20000):
+    def __convert (self, file_descr, nrows = 20000):
 
         # JSON
         if (file_descr['FileType'] == '.json'):
 
             # Open File and Convert it to JSON Object
-            with open(self.filepath, 'r') as file:
+            with open(self.__filepath, 'r') as file:
                 data = ijson.items(file, 'item')
                 json_object = []
                 count = 0
@@ -40,12 +38,12 @@ class Gather:
         # CSV
         elif (file_descr['FileType'] == '.csv'):
 
-            # Check whether there is a header | TODO
-            return pd.read_csv(self.filepath, nrows=nrows)
+            # Check whether there is a header 
+            return pd.read_csv(self.__filepath, nrows=nrows)
         
         # Arff
         elif (file_descr['FileType'] == '.arff'):
-            data = arff.loadarff(self.filepath)
+            data = arff.loadarff(self.__filepath)
             df = pd.DataFrame(data[0])
             for i in df.columns:
                 if (df[i].dtype.name == 'object'):
@@ -59,9 +57,9 @@ class Gather:
     def gather(self):
 
         # File Characteristics
-        file_characteristics = self._descr()
+        file_characteristics = self.__descr()
 
         # Dataframe Initialization 
-        df = self._convert(file_characteristics)
+        df = self.__convert(file_characteristics)
 
         return df

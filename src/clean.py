@@ -1,53 +1,51 @@
 # Libraries
 
-# Core Libraries
-import pandas as pd
-
 # Sk learn 
 from sklearn.impute import SimpleImputer
 
 # App Libs
 from .prof import Profile
 
-# Class Clean
 class Clean:
 
     # Constructor
-    def __init__(self, train, test, profile, params):
-        self.train = train
-        self.test = test
-        self.profile = profile
-        self.params = params
+    def __init__(self, train, test, target, params):
+        self.__train = train
+        self.__test = test
+        self.__target = target
+        self.__params = params
+
+        self.__profile =  None
 
     # Getters & Setters
     @property
     def get_train(self):
-        return self.train
+        return self.__train
 
     @property
     def get_test(self):
-        return self.test
+        return self.__test
 
     # Drop Duplicates
-    def drop_duplicates(self):
+    def __drop_duplicates(self):
 
-        self.train.drop_duplicates()
-        self.test.drop_duplicates()
+        self.__train.drop_duplicates()
+        self.__test.drop_duplicates()
 
     # Drop Features | IDs, Missing Values > Thres 
-    def drop(self, drop_perc): 
+    def __drop_features(self, drop_perc): 
 
         # Drop Features with missing percentage > thres
-        for f, details in self.profile['features'].items():
+        for f, details in self.__profile['features'].items():
 
             # If missing values are above threshold | Drop
             if (details['eda']['missing_data']['percentage'] >= drop_perc):
 
-                self.train = self.train.drop(columns=[f])
-                self.test = self.test.drop(columns=[f])
+                self.__train = self.__train.drop(columns=[f])
+                self.__test = self.__test.drop(columns=[f])
 
     # Data Imputation | {Dataframe, Profile, EDA}
-    def impute(self, num_type):
+    def __impute(self, num_type):
 
         # Split Categorical and Numerical Columns
         numerical_columns = []
@@ -55,7 +53,7 @@ class Clean:
         alphanumerical_columns = []
 
         # For each feature
-        for f, p in self.profile['features'].items():
+        for f, p in self.__profile['features'].items():
 
             # Split | If missing percentage is above 0
             if (p['eda']['missing_data']['missing_values'] > 0.0):
@@ -77,74 +75,74 @@ class Clean:
         if (len(numerical_columns) > 0):
 
             # Train
-            self.train[numerical_columns] = numerical_imputer.fit_transform(self.train[numerical_columns])
+            self.__train[numerical_columns] = numerical_imputer.fit_transform(self.__train[numerical_columns])
 
             # Test
-            self.test[numerical_columns] = numerical_imputer.transform(self.test[numerical_columns])
+            self.__test[numerical_columns] = numerical_imputer.transform(self.__test[numerical_columns])
 
         # Mode | Categorical
         if (len(categorical_columns) > 0):
 
             # Train
-            self.train[categorical_columns] = categorical_imputer.fit_transform(self.train[categorical_columns])
+            self.__train[categorical_columns] = categorical_imputer.fit_transform(self.__train[categorical_columns])
 
             # Test
-            self.test[categorical_columns] = categorical_imputer.transform(self.test[categorical_columns])
+            self.__test[categorical_columns] = categorical_imputer.transform(self.__test[categorical_columns])
 
         # Empty Space | Alphanumerical
         if (len(alphanumerical_columns) > 0):
 
             # Train
-            self.train[alphanumerical_columns] = self.train[alphanumerical_columns].fillna('')
+            self.__train[alphanumerical_columns] = self.__train[alphanumerical_columns].fillna('')
 
             # Test
-            self.test[alphanumerical_columns] = self.test[alphanumerical_columns].fillna('')
+            self.__test[alphanumerical_columns] = self.__test[alphanumerical_columns].fillna('')
 
     # Handle Outliers | {Dataframe, Profile, EDA, Threshold}
-    def handle_outliers(self, iqr_thres : float = 1.5):
+    def __handle_outliers(self, iqr_thres : float = 1.5):
 
         # Numerical Columns
         numerical_columns = []
-        for f, p in self.profile['features'].items():
+        for f, p in self.__profile['features'].items():
             if (p['feature_type'] == 'Numerical'):
                 numerical_columns.append(f)
 
         for f in numerical_columns: 
 
             # Boundaries on train set
-            Q1 = self.train[f].quantile(0.25)
-            Q3 = self.train[f].quantile(0.75)
+            Q1 = self.__train[f].quantile(0.25)
+            Q3 = self.__train[f].quantile(0.75)
 
             IQR = Q3 - Q1 
 
             # Train
-            outliers_train = ((self.train[f] < (Q1 - iqr_thres * IQR)) | (self.train[f] > (Q3 + iqr_thres * IQR)))
-            self.train = self.train[~outliers_train]
-
-            # Test
-            # outliers_test = ((self.test[f] < (Q1 - iqr_thres * IQR)) | (self.test[f] > (Q3 + iqr_thres * IQR)))
-            # self.test = self.test[~outliers_test]
+            outliers_train = ((self.__train[f] < (Q1 - iqr_thres * IQR)) | (self.__train[f] > (Q3 + iqr_thres * IQR)))
+            self.__train = self.__train[~outliers_train]
 
     # Dataframe Clean | {Dataframe, Description, MV Thres, Outlier Thres, Unique Value Thres}
-    def clean (self, profile_params):
+    def clean (self):
+
+        ## Describe
+        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        self.__profile = profile.data_profile()
 
         # Drop Duplicates
-        self.drop_duplicates()
+        self.__drop_duplicates()
 
         # Drop Features
-        self.drop(self.params['drop_thres'])
+        self.__drop_features(self.__params['clean']['drop_thres'])
 
         ## Describe
-        profile = Profile(self.train, self.profile['target_feature'], profile_params)
-        self.profile = profile.df_profile()
+        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        self.__profile = profile.data_profile()
 
         # Data Imputation 
-        self.impute(self.params['num_type'])
+        self.__impute(self.__params['clean']['num_type'])
 
         ## Describe
-        profile = Profile(self.train, self.profile['target_feature'], profile_params)
-        self.profile = profile.df_profile()
+        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        self.__profile = profile.data_profile()
 
         # Drop Outliers 
-        if (self.params['outlier_thres'] != 'none'):
-            self.handle_outliers(self.params['outlier_thres'])
+        if (self.__params['clean']['outlier_thres'] != 'none'):
+            self.__handle_outliers(self.__params['clean']['outlier_thres'])

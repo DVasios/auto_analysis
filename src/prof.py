@@ -6,42 +6,55 @@ from visions.typesets import StandardSet
 class Profile: 
 
     def __init__(self, d, target, params):
-        self.d = d
-        self.target = target
-        self.params = params
+        self.__d = d
+        self.__target = target
+        self.__params = params
 
     ## Dataset
 
     # Features, Rows
-    def shape(self):
+    def __shape(self):
         return {
-            'features': self.d.shape[1],
-            'rows': self.d.shape[0]
+            'features': self.__d.shape[1],
+            'rows': self.__d.shape[0]
         }
     
-    ## Duplicates | Check if they exist
-    def duplicates(self):
+    # Duplicates | Check if they exist
+    def __duplicates(self):
         return {
-            'exist' : self.d.duplicated().any(),
-            'sum' : self.d.duplicated().sum()
+            'exist' : self.__d.duplicated().any(),
+            'sum' : self.__d.duplicated().sum()
         } 
+    
+    # Dataset
+    def dataset(self):
 
-    ## Features Characteristics
+        dataset = {}
+
+        # Dataset
+        dataset = self.__shape()
+
+        # Duplicates
+        dataset['duplicates'] = self.__duplicates()
+
+        return dataset
+
+    ## Features Profile
 
     # Data Type | Standard Set | Integer,  Float, Boolean, DateTime, String
-    def data_type(self, f):
+    def __data_type(self, f):
 
         typeset = StandardSet()
         return str(typeset.infer_type(f.astype(str)))
 
     # Feature Type | Categorical, Numerical, Alphanumerical | {Data Type, Unique values Ratio, Thres}
-    def feature_type(self, f, data_type): 
+    def __feature_type(self, f, data_type): 
 
         # Unique Values Ratio
         unique_values = len(f.value_counts()) 
         unique_values_ratio = unique_values / f.count()
 
-        if ((f.dtype.name == 'object') and unique_values_ratio < self.params['cat_thres']):
+        if ((f.dtype.name == 'object') and unique_values_ratio < self.__params['cat_thres']):
             return 'Categorical'
         elif (data_type == 'Integer' or data_type == 'Float'):
             return 'Numerical'
@@ -49,29 +62,29 @@ class Profile:
             return 'Alphanumerical'
         
     # Role | Input (Independant), ID (Unique Identifier)
-    def role(self, f, data_type):
+    def __role(self, f, data_type):
         
         f_unique_values = len(f.unique())
         f_total_values = len(f)
 
-        if ((data_type != 'Float' and data_type != 'Integer') and f_total_values > 0 and (f_unique_values / f_total_values)) > self.params['id_thres']: 
+        if ((data_type != 'Float' and data_type != 'Integer') and f_total_values > 0 and (f_unique_values / f_total_values)) > self.__params['id_thres']: 
             return 'id'
-        elif (f.name == self.target): 
+        elif (f.name == self.__target): 
             return 'target'
         else:
             return 'input' 
         
-    ## Feature Profiling  | {Feature, Objective, Unique Values Threshold}
-    def profile(self, f):
+    ## Features Profiling  | {Feature, Objective, Unique Values Threshold}
+    def feature_profile(self, f):
         
         # Data Type
-        data_type = self.data_type(f)
+        data_type = self.__data_type(f)
 
         # Role
-        role = self.role(f, data_type)
+        role = self.__role(f, data_type)
 
         # Feature Type
-        feature_type = self.feature_type(f, data_type)
+        feature_type = self.__feature_type(f, data_type)
 
         return {
             'data_type' : data_type,
@@ -82,7 +95,7 @@ class Profile:
     ## Features Univariate
 
     # Statistics
-    def statistics(self, f, d_type, f_type):
+    def __statistics(self, f, d_type, f_type):
 
         f_statistics = {}
         if f_type == 'Numerical' and d_type != 'String':
@@ -108,7 +121,7 @@ class Profile:
         return f_statistics
 
     # Missing Values | Return: {Total Missing Values, Percentage}
-    def missing_data(self, f):
+    def __missing_data(self, f):
 
         # Null Values
         null_values = f.isnull().sum() 
@@ -127,41 +140,36 @@ class Profile:
         }
 
     ## Univariate | Feature | {Dataframe_Feature, Data Type, Feature Type}
-    def univariate(self, f, d_type, f_type): 
+    def feature_univariate(self, f, d_type, f_type): 
         f_univariate = {}
 
         # Statistics
-        f_univariate['statistics'] = self.statistics(f, d_type, f_type)
+        f_univariate['statistics'] = self.__statistics(f, d_type, f_type)
 
         # Missing Values
-        f_univariate['missing_data'] = self.missing_data(f)
+        f_univariate['missing_data'] = self.__missing_data(f)
 
         return f_univariate
 
     ## All feature profiling
-    def df_profile(self):
-
-        # unique_values_ratio | Param
+    def data_profile(self):
 
         df_profile = {}
 
         # Dataset
-        df_profile['dataset'] = self.shape()
-
-        # Duplicates
-        df_profile['dataset']['duplicates'] = self.duplicates()
+        df_profile['dataset'] = self.dataset()
 
         # Target Feature
-        df_profile['target_feature'] = self.target
+        df_profile['target_feature'] = self.__target
 
-        # Features
+        # Features Profiling
         df_features = {}
-        for f in self.d.columns: 
-            df_features[f] = self.profile(self.d[f])
+        for f in self.__d.columns: 
+            df_features[f] = self.feature_profile(self.__d[f])
         df_profile['features'] = df_features
 
-        # Univariate
+        # Features Univariate 
         for f, d in df_profile['features'].items():
-            df_profile['features'][f]['eda'] = self.univariate(self.d[f], d['data_type'], d['feature_type'])
+            df_profile['features'][f]['eda'] = self.feature_univariate(self.__d[f], d['data_type'], d['feature_type'])
 
         return df_profile 
