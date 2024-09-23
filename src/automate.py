@@ -147,7 +147,8 @@ class Automate:
                     ('lr', model2),
                     ('nb', model3)
                 ],
-                voting='hard'  # Use 'soft' for probability-based voting
+                voting='hard',
+                n_jobs=-1
                 )
 
         # Fit data to model
@@ -294,7 +295,7 @@ class Automate:
             Categorical([0.4, 0.5, 0.75, 1], name='select_perc'),
         ]
 
-        result = gp_minimize(self.__objective, search_space, n_initial_points=10, n_calls=n_iter, n_jobs=-1)
+        result = gp_minimize(self.__objective, search_space, n_calls=n_iter, n_jobs=-1)
 
         return result
 

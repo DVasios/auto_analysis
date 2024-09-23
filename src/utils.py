@@ -19,7 +19,7 @@ def plot_convergence_random(accuracies):
     # Add labels and title
     plt.xlabel('Iterations')
     plt.ylabel('Accuracy')
-    plt.title('Line Plot Example')
+    plt.title('Random Search Optimization')
 
     # Show legend (for the label)
     plt.legend()

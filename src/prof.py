@@ -12,7 +12,7 @@ class Profile:
 
     ## Dataset
 
-    # Features, Rows
+    # Features, RowRandom Search Optimizations
     def __shape(self):
         return {
             'features': self.__d.shape[1],
