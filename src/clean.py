@@ -75,28 +75,28 @@ class Clean:
         if (len(numerical_columns) > 0):
 
             # Train
-            self.__train[numerical_columns] = numerical_imputer.fit_transform(self.__train[numerical_columns])
+            self.__train.loc[:, numerical_columns] = numerical_imputer.fit_transform(self.__train[numerical_columns])
 
             # Test
-            self.__test[numerical_columns] = numerical_imputer.transform(self.__test[numerical_columns])
+            self.__test.loc[:, numerical_columns] = numerical_imputer.transform(self.__test[numerical_columns])
 
         # Mode | Categorical
         if (len(categorical_columns) > 0):
 
             # Train
-            self.__train[categorical_columns] = categorical_imputer.fit_transform(self.__train[categorical_columns])
+            self.__train.loc[:, categorical_columns] = categorical_imputer.fit_transform(self.__train[categorical_columns])
 
             # Test
-            self.__test[categorical_columns] = categorical_imputer.transform(self.__test[categorical_columns])
+            self.__test.loc[:, categorical_columns] = categorical_imputer.transform(self.__test[categorical_columns])
 
         # Empty Space | Alphanumerical
         if (len(alphanumerical_columns) > 0):
 
             # Train
-            self.__train[alphanumerical_columns] = self.__train[alphanumerical_columns].fillna('')
+            self.__train.loc[:, alphanumerical_columns] = self.__train[alphanumerical_columns].fillna('')
 
             # Test
-            self.__test[alphanumerical_columns] = self.__test[alphanumerical_columns].fillna('')
+            self.__test.loc[:, alphanumerical_columns] = self.__test[alphanumerical_columns].fillna('')
 
     # Handle Outliers | {Dataframe, Profile, EDA, Threshold}
     def __handle_outliers(self, iqr_thres : float = 1.5):

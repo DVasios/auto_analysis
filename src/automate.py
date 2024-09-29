@@ -16,6 +16,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from xgboost import XGBClassifier
 
@@ -36,6 +37,14 @@ from .clean import Clean
 from .engineer import Engineer
 from .utils import plot_convergence_random, has_missing_data
 
+# Warnings# App Libs
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+warnings.filterwarnings('ignore', category=ConvergenceWarning)
+
 class Automate:
 
     # X_train, X_test
@@ -46,11 +55,9 @@ class Automate:
     X_train_preprocessed = None
     X_test_preprocessed = None
 
-    # Preprocessed Best
-    X_train_preprocessed_best = None
-    X_test_preprocessed_best = None
-
     # DFs
+    df_start = None
+
     df = None
     df_profile = None
 
@@ -59,6 +66,9 @@ class Automate:
 
     df_egineered = None
     df_egineered_profile = None
+
+    # Best params
+    best_params = None
 
     # Other
     iter = 1
@@ -113,6 +123,14 @@ class Automate:
         y_train = self.X_train_preprocessed[self.__auto_params['target']]
         y_test = self.X_test_preprocessed[self.__auto_params['target']]
 
+        # If label has only one value
+        if (y_train.nunique() == 1):
+            return 0 
+        
+        # If y_train and y_test labels doesn't match
+        if set(y_train.unique()) != set(y_test.unique()):
+            return 0
+
         # Transform Labels if they are strings
         if (y_train.dtype.name == 'object'):
             label_encoder = LabelEncoder()
@@ -160,9 +178,6 @@ class Automate:
         # Evaluate
         accuracy = accuracy_score(y_test, y_pred)
 
-        # Scores
-        scores = cross_val_score(model, x_train, y_train, cv=5)
-
         return accuracy
 
     # Objective
@@ -199,23 +214,38 @@ class Automate:
                 'engineer' : engineering_params,
             }
 
-        # Preprocess
-        self.X_train_preprocessed, self.X_test_preprocessed = self.__preprocess(params)
+        # Accuracies
+        accuracies = []
 
-        # Train model
-        accuracy = round(self.__train_model(self.__auto_params['model']), 4)
-        if(self.__auto_params['opt_method'] == 'bayesian'):
-            accuracy = 1 - accuracy
+        kf = KFold(n_splits=self.auto_params['cv'], shuffle=True, random_state=None)
 
-        # Current Accuracy
+        for train_index, test_index in kf.split(self.df_start):
+
+            # Split Train, Test
+            self.X_train, self.X_test = self.df_start.iloc[train_index], self.df_start.iloc[test_index]
+
+            # Preprocess
+            self.X_train_preprocessed, self.X_test_preprocessed = self.__preprocess(params)
+
+            # Train model
+            accuracies.append(round(self.__train_model(self.__auto_params['model']), 4))
+        
+        # Final Accuracy
+        accuracy = np.mean(accuracies)
+
+        # Best accuracy and best params
         if (accuracy > self.best_acc):
-            self.X_train_preprocessed_best = self.X_train_preprocessed
-            self.X_test_preprocessed_best = self.X_test_preprocessed
+            self.best_acc = accuracy
+            self.best_params = params
 
         # Log
         print(f"\rIteration: {self.iter}/{self.__auto_params['n_iter']}", end="")
         self.iter += 1
-           
+
+        # Accuracy   
+        if(self.__auto_params['opt_method'] == 'bayesian'):
+            accuracy = 1 - accuracy
+
         return accuracy
 
     # Optimization Method
@@ -238,7 +268,7 @@ class Automate:
             # Clean Parameters
             clean_params = {
                 'drop_thres' : random.choice([0.5, 0.6, 0.7]),
-                'outlier_thres' : random.choice([1.5, 2, 3, 4]),
+                'outlier_thres' : random.choice(['none', 1.5, 2, 3, 4]),
                 'num_type' : random.choice(['mean', 'median'])
             }
 
@@ -313,7 +343,7 @@ class Automate:
             return res
 
     # Automated Data Preprocessing | {File Source, Problem Type, Target}
-    def auto_preproc (self):
+    def auto_analysis (self):
 
         ## Start Time
         start_time = time.time()
@@ -321,9 +351,7 @@ class Automate:
         # Gather Data from source file
         gather = Gather(self.__auto_params['filepath'])
         df = gather.gather()
-
-        # Split Train, Test
-        self.X_train, self.X_test = train_test_split(df, test_size=0.2, random_state=42)
+        self.df_start = df
 
         # Run Optimization Method
         result = self.__optimize()
@@ -348,9 +376,17 @@ class Automate:
     # Model + HP Optimization
     def hp_optization(self, n_iter):
 
-        # Labels
-        y_train = self.X_train_preprocessed_best[self.__auto_params['target']]
-        y_test = self.X_test_preprocessed_best[self.__auto_params['target']]
+        # Split Train, Test
+        self.X_train, self.X_test = train_test_split(self.df_start, test_size=0.2, random_state=42)
+        y_train = self.X_train[self.__auto_params['target']]
+        y_test = self.X_test[self.__auto_params['target']]
+
+        # Check if the unique values are exactly [-1, 1]
+        if set(y_train.unique()) == {-1, 1}:
+
+            # Map -1 to 0
+            y_train = y_train.replace(-1, 0)
+            y_test = y_test.replace(-1, 0)
 
         # Transform Labels if they are strings
         if (y_train.dtype.name == 'object'):
@@ -358,12 +394,15 @@ class Automate:
             label_encoder.fit(y_train)
 
             # Transform both train and test sets using the same encoder
-            y_train = pd.DataFrame(label_encoder.transform(y_train))
-            y_test = pd.DataFrame(label_encoder.transform(y_test))
+            y_train = label_encoder.transform(y_train)
+            y_test = label_encoder.transform(y_test)
+
+        # Preprocess
+        self.X_train_preprocessed, self.X_test_preprocessed = self.__preprocess(self.best_params)
 
         # Drop Targets
-        x_train = self.X_train_preprocessed_best.drop(columns=[self.__auto_params['target']])
-        x_test = self.X_test_preprocessed_best.drop(columns=[self.__auto_params['target']])
+        x_train = self.X_train_preprocessed.drop(columns=[self.__auto_params['target']])
+        x_test = self.X_test_preprocessed.drop(columns=[self.__auto_params['target']])
 
         # Define the model
         xgb_model = XGBClassifier()
@@ -378,7 +417,7 @@ class Automate:
         }
 
         # Initialize RandomizedSearchCV
-        random_search = RandomizedSearchCV(estimator=xgb_model, param_distributions=param_distributions, n_iter=n_iter, cv=5, verbose=1, n_jobs=-1)
+        random_search = RandomizedSearchCV(estimator=xgb_model, param_distributions=param_distributions, n_iter=n_iter, cv=5, verbose=2, n_jobs=-1)
 
         # Fit the model with the training data
         random_search.fit(x_train, y_train)

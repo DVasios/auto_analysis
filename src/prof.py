@@ -22,8 +22,8 @@ class Profile:
     # Duplicates | Check if they exist
     def __duplicates(self):
         return {
-            'exist' : self.__d.duplicated().any(),
-            'sum' : self.__d.duplicated().sum()
+            'exist' : bool(self.__d.duplicated().any()),
+            'sum' : int(self.__d.duplicated().sum())
         } 
     
     # Dataset
@@ -103,10 +103,10 @@ class Profile:
             descr = f.describe()
             f_statistics = {
                 'count' : int(descr['count']),
-                'mean' : round(descr['mean'], 2),
-                'std' : round(descr['std'], 2),
-                'min' : round(descr['min'], 2),
-                'max' : round(descr['max'], 2)
+                'mean' : float(round(descr['mean'], 2)),
+                'std' : float(round(descr['std'], 2)),
+                'min' : float(round(descr['min'], 2)),
+                'max' : float(round(descr['max'], 2))
             }
         elif f_type == 'Categorical': 
             for i, y in f.value_counts().items():
@@ -115,7 +115,7 @@ class Profile:
                 freq = round(y / len(f), 2)
                 f_statistics[i] = {
                     'value': y,
-                    'frequency': freq
+                    'frequency': int(freq)
                 }
 
         return f_statistics
@@ -135,8 +135,8 @@ class Profile:
         ## Percentage
         percentage = round((missing_values / len(f)), 2)
         return {
-            'missing_values': missing_values,
-            'percentage': percentage
+            'missing_values': bool(missing_values),
+            'percentage': float(percentage)
         }
 
     ## Univariate | Feature | {Dataframe_Feature, Data Type, Feature Type}
