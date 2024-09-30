@@ -1,4 +1,4 @@
-Dataset,Features,Rows,MissingData,Duplicates,BestAccuracy,TimeRunning,Iteration,OutlierThres,ImputationType,EncodingType,ScaleType,SelectionType,SelectionPercentage
-data/bank/bank.csv,17,8929,False,False,0.8097,1 minutes and 29 seconds,none,Median,One-Hot,None,Variance_Thres,0.75
-data/connect-4/data.csv,43,16000,False,False,0.8037,2 minutes and 30 seconds,10,none,Mean,One-Hot,Min-Max,Variance_Thres,0.6
-data/titanic/titanic.csv,12,712,True,False,0.8148,1 minutes and 0 seconds,20,none,Mean,One-Hot,Robust,Mi,1
+Dataset,Features,Rows,MissingData,Duplicates,Model,SimpleAccuracy,AdvancedAccuracy,TimeRunning,Iteration,OutlierThres,ImputationType,EncodingType,ScaleType,SelectionType,SelectionPercentage
+ada_prior,15,3649,True,False,ensemble,0.8409,0.8521,8 minutes and 59 seconds,50,none,Median,One-Hot,Robust,Mi,0.5
+data/ada_prior/ada_prior.csv,15,3649,True,False,lg,0.8442,0.8488,10 minutes and 8 seconds,50,none,Mean,One-Hot,Std,Mi,0.5
+data/eeg/data.csv,15,11984,False,False,ensemble,0.8215,0.9483,18 minutes and 14 seconds,50,none,Mean,One-Hot,Min-Max,Variance_Thres,0.75

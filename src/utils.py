@@ -8,10 +8,25 @@ def has_missing_data(df_descr):
             return True
     return False
 
-def plot_convergence_random(accuracies):
+def plot_convergence(type, accuracies):
 
-    x_labels = [i for i in range(len(accuracies))]
-    y_labels = [1-i for i in accuracies]
+    if (type == 'bayesian'):
+        x_labels = [i for i in range(len(accuracies))]
+        y_labels = []
+        cur_best = 2
+        for i in accuracies:
+            if (i < cur_best):
+                y_labels.append(i)
+                cur_best = i
+            else:
+                y_labels.append(cur_best)
+        
+        title = 'Bayesian Optimization'
+
+    elif (type == 'random'):
+        x_labels = [i for i in range(len(accuracies))]
+        y_labels = [1-i for i in accuracies]
+        title = 'Random Search Optimization'
 
     # Create the line plot
     plt.plot(x_labels, y_labels, label='Optimization Accuracies', color='blue', marker='o')
@@ -19,7 +34,7 @@ def plot_convergence_random(accuracies):
     # Add labels and title
     plt.xlabel('Iterations')
     plt.ylabel('Accuracy')
-    plt.title('Random Search Optimization')
+    plt.title(title)
 
     # Show legend (for the label)
     plt.legend()

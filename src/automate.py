@@ -7,14 +7,11 @@ import pandas as pd
 # Skicit Learn 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import VotingClassifier
 from sklearn.metrics import accuracy_score
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
@@ -22,7 +19,6 @@ from xgboost import XGBClassifier
 
 # Skicit Optimize
 from skopt import gp_minimize
-from skopt.plots import plot_convergence, plot_evaluations
 from skopt.space import Real, Categorical
 
 # Helpers
@@ -35,15 +31,15 @@ from .gather import Gather
 from .prof import Profile
 from .clean import Clean
 from .engineer import Engineer
-from .utils import plot_convergence_random, has_missing_data
+from .utils import plot_convergence, has_missing_data
 
 # Warnings# App Libs
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=RuntimeWarning)
-warnings.filterwarnings('ignore', category=ConvergenceWarning)
+warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore', category=RuntimeWarning)
+# warnings.filterwarnings('ignore', category=ConvergenceWarning)
 
 class Automate:
 
@@ -74,7 +70,8 @@ class Automate:
     iter = 1
     result = None
     run_time = None
-    best_acc = None
+    simple_acc = None
+    adv_acc = None
 
     def __init__(self, auto_params):
         self.__auto_params = auto_params
@@ -146,7 +143,7 @@ class Automate:
 
         # Model
         if (m == 'lg'):
-            model = LogisticRegression(random_state=42)
+            model = LogisticRegression(n_jobs=-1, random_state=42)
         
         elif (m == 'dt'):
             model = DecisionTreeClassifier(random_state=42)
@@ -217,7 +214,7 @@ class Automate:
         # Accuracies
         accuracies = []
 
-        kf = KFold(n_splits=self.auto_params['cv'], shuffle=True, random_state=None)
+        kf = KFold(n_splits=self.__auto_params['cv'], shuffle=True, random_state=None)
 
         for train_index, test_index in kf.split(self.df_start):
 
@@ -234,8 +231,8 @@ class Automate:
         accuracy = np.mean(accuracies)
 
         # Best accuracy and best params
-        if (accuracy > self.best_acc):
-            self.best_acc = accuracy
+        if (accuracy > self.simple_acc):
+            self.simple_acc = accuracy
             self.best_params = params
 
         # Log
@@ -333,7 +330,7 @@ class Automate:
     def __optimize(self):
 
         # Initialize Variables
-        self.best_acc = 0
+        self.simple_acc = 0
 
         if (self.__auto_params['opt_method'] == 'random'):
             return self.__random_search(self.__auto_params['n_iter'])
@@ -381,12 +378,6 @@ class Automate:
         y_train = self.X_train[self.__auto_params['target']]
         y_test = self.X_test[self.__auto_params['target']]
 
-        # Check if the unique values are exactly [-1, 1]
-        if set(y_train.unique()) == {-1, 1}:
-
-            # Map -1 to 0
-            y_train = y_train.replace(-1, 0)
-            y_test = y_test.replace(-1, 0)
 
         # Transform Labels if they are strings
         if (y_train.dtype.name == 'object'):
@@ -396,6 +387,10 @@ class Automate:
             # Transform both train and test sets using the same encoder
             y_train = label_encoder.transform(y_train)
             y_test = label_encoder.transform(y_test)
+
+        label_encoder = LabelEncoder()
+        y_train = label_encoder.fit_transform(y_train)
+        y_test = label_encoder.transform(y_test)
 
         # Preprocess
         self.X_train_preprocessed, self.X_test_preprocessed = self.__preprocess(self.best_params)
@@ -430,6 +425,7 @@ class Automate:
 
         # Evaluate the model
         accuracy = accuracy_score(y_test, y_pred)
+        self.adv_acc = accuracy
         print(f"Best XGBoost Accuracy: {accuracy:.4f}")
         print("Best Parameters:", random_search.best_params_)
 
@@ -487,10 +483,9 @@ class Automate:
     def plot(self):
 
         if (self.__auto_params['opt_method'] == 'bayesian'):
-
-            plot_convergence(self.result)
+            plot_convergence('bayesian', self.result['func_vals'])
         else:
-            plot_convergence_random(self.result[3])
+            plot_convergence('random', self.result[3])
 
     # Extract Results
     def save(self, filepath):
@@ -508,7 +503,9 @@ class Automate:
              self.df_profile['dataset']['rows'],
              has_missing_data(self.df_profile),
              self.df_profile['dataset']['duplicates']['exist'],
+             self.__auto_params['model'],
              round(acc, 4),
+             round(self.adv_acc, 4),
              self.run_time,
              self.__auto_params['n_iter'],
              pip[2],
