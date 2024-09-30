@@ -226,7 +226,7 @@ class Automate:
 
             # Train model
             accuracies.append(round(self.__train_model(self.__auto_params['model']), 4))
-        
+
         # Final Accuracy
         accuracy = np.mean(accuracies)
 
