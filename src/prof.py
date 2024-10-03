@@ -5,10 +5,9 @@ from visions.typesets import StandardSet
 
 class Profile: 
 
-    def __init__(self, d, target, params):
+    def __init__(self, d, target):
         self.__d = d
         self.__target = target
-        self.__params = params
 
     ## Dataset
 
@@ -54,7 +53,7 @@ class Profile:
         unique_values = len(f.value_counts()) 
         unique_values_ratio = unique_values / f.count()
 
-        if ((f.dtype.name == 'object') and unique_values_ratio < self.__params['cat_thres']):
+        if ((f.dtype.name == 'object') and unique_values_ratio < 0.1):
             return 'Categorical'
         elif (data_type == 'Integer' or data_type == 'Float'):
             return 'Numerical'
@@ -67,7 +66,7 @@ class Profile:
         f_unique_values = len(f.unique())
         f_total_values = len(f)
 
-        if ((data_type != 'Float' and data_type != 'Integer') and f_total_values > 0 and (f_unique_values / f_total_values)) > self.__params['id_thres']: 
+        if ((data_type != 'Float' and data_type != 'Integer') and f_total_values > 0 and (f_unique_values / f_total_values)) > 0.9: 
             return 'id'
         elif (f.name == self.__target): 
             return 'target'

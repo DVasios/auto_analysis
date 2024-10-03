@@ -57,7 +57,7 @@ class Engineer:
                 # Keep specific columns
                 term_document_frequency = (f_extracted_train > 0).sum(axis=0)
                 term_document_frequency_ratio = term_document_frequency / self.__train[f].count()
-                columns_to_keep = term_document_frequency[term_document_frequency_ratio >= self.__params['engineer']['freq_thres']].index
+                columns_to_keep = term_document_frequency[term_document_frequency_ratio >= 0.15].index
 
                 # Filter
                 f_extracted_train_filtered = f_extracted_train[columns_to_keep]
@@ -282,14 +282,14 @@ class Engineer:
     def engineer(self): 
 
         ## Describe
-        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        profile = Profile(self.__train, self.__target)
         self.profile = profile.data_profile()
 
         # Feature Extraction
         self.__extract()
 
         ## Describe
-        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        profile = Profile(self.__train, self.__target)
         self.profile = profile.data_profile()
 
         # Feature Encoding

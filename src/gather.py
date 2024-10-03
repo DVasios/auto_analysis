@@ -19,7 +19,7 @@ class Gather:
         return descr
 
     # Converters | File type to Dataframe
-    def __convert (self, file_descr, nrows = 20000):
+    def __convert (self, file_descr, nrows = 10000):
 
         # JSON
         if (file_descr['FileType'] == '.json'):

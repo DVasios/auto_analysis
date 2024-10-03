@@ -33,19 +33,19 @@ class Clean:
         self.__test.drop_duplicates()
 
     # Drop Features | IDs, Missing Values > Thres 
-    def __drop_features(self, drop_perc): 
+    def __drop_features(self): 
 
         # Drop Features with missing percentage > thres
         for f, details in self.__profile['features'].items():
 
             # If missing values are above threshold | Drop
-            if (details['eda']['missing_data']['percentage'] >= drop_perc):
+            if (details['eda']['missing_data']['percentage'] >= 0.7):
 
                 self.__train = self.__train.drop(columns=[f])
                 self.__test = self.__test.drop(columns=[f])
 
     # Data Imputation | {Dataframe, Profile, EDA}
-    def __impute(self, num_type):
+    def __impute(self):
 
         # Split Categorical and Numerical Columns
         numerical_columns = []
@@ -68,7 +68,7 @@ class Clean:
                     alphanumerical_columns.append(f)
 
         # Imputers
-        numerical_imputer = SimpleImputer(strategy=num_type)
+        numerical_imputer = SimpleImputer(strategy=self.__params['clean']['impute_type'])
         categorical_imputer = SimpleImputer(strategy='most_frequent')
 
         # Numerical
@@ -99,50 +99,66 @@ class Clean:
             self.__test.loc[:, alphanumerical_columns] = self.__test[alphanumerical_columns].fillna('')
 
     # Handle Outliers | {Dataframe, Profile, EDA, Threshold}
-    def __handle_outliers(self, iqr_thres : float = 1.5):
+    def __handle_outliers(self):
 
         # Numerical Columns
         numerical_columns = []
         for f, p in self.__profile['features'].items():
             if (p['feature_type'] == 'Numerical'):
                 numerical_columns.append(f)
+        # IQR 
+        if (self.__params['clean']['outlier_type'] == 'iqr'):
 
-        for f in numerical_columns: 
+            for f in numerical_columns: 
 
-            # Boundaries on train set
-            Q1 = self.__train[f].quantile(0.25)
-            Q3 = self.__train[f].quantile(0.75)
+                # Boundaries on train set
+                Q1 = self.__train[f].quantile(0.25)
+                Q3 = self.__train[f].quantile(0.75)
 
-            IQR = Q3 - Q1 
+                IQR = Q3 - Q1 
 
-            # Train
-            outliers_train = ((self.__train[f] < (Q1 - iqr_thres * IQR)) | (self.__train[f] > (Q3 + iqr_thres * IQR)))
-            self.__train = self.__train[~outliers_train]
+                # Train
+                outliers = ((self.__train[f] < (Q1 - 1.5 * IQR)) | (self.__train[f] > (Q3 +  1.5 * IQR)))
+                self.__train = self.__train[~outliers]
+
+        # Z-Score
+        if (self.__params['clean']['outlier_type'] == 'z-score'):
+
+            for f in numerical_columns: 
+
+                mean = self.__train[f].mean()
+                std_dev = self.__train[f].std()
+
+                z_scores = (self.__train[f] - mean) / std_dev
+
+                threshold = 3
+                outliers = (z_scores > threshold) | (z_scores < -threshold)
+                self.__train = self.__train[~outliers]
 
     # Dataframe Clean | {Dataframe, Description, MV Thres, Outlier Thres, Unique Value Thres}
     def clean (self):
 
         ## Describe
-        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        profile = Profile(self.__train, self.__target)
         self.__profile = profile.data_profile()
 
         # Drop Duplicates
         self.__drop_duplicates()
 
         # Drop Features
-        self.__drop_features(self.__params['clean']['drop_thres'])
+        self.__drop_features()
 
         ## Describe
-        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        profile = Profile(self.__train, self.__target)
         self.__profile = profile.data_profile()
 
         # Data Imputation 
-        self.__impute(self.__params['clean']['num_type'])
+        self.__impute()
 
         ## Describe
-        profile = Profile(self.__train, self.__target, self.__params['profile'])
+        profile = Profile(self.__train, self.__target)
         self.__profile = profile.data_profile()
 
         # Drop Outliers 
-        if (self.__params['clean']['outlier_thres'] != 'none'):
-            self.__handle_outliers(self.__params['clean']['outlier_thres'])
+        if (self.__params['clean']['outlier_type'] != 'none'):
+            self.__handle_outliers()
