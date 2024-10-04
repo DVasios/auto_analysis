@@ -121,20 +121,21 @@ class Automate:
         if set(y_train.unique()) != set(y_test.unique()):
             return 0
 
-        # Transform Labels if they are strings
-        if (y_train.dtype.name == 'object'):
-            label_encoder = LabelEncoder()
-            label_encoder.fit(y_train)
+        # Transform Labels 
+        label_encoder = LabelEncoder()
+        label_encoder.fit(y_train)
 
-            # Transform both train and test sets using the same encoder
-            y_train = pd.DataFrame(label_encoder.transform(y_train))
-            y_test = pd.DataFrame(label_encoder.transform(y_test))
+        # Transform both train and test sets using the same encoder
+        y_train = pd.DataFrame(label_encoder.transform(y_train))
+        y_test = pd.DataFrame(label_encoder.transform(y_test))
 
         # Drop Targets
         x_train = self.X_train_preprocessed.drop(columns=[self.__auto_params['target']])
         x_test = self.X_test_preprocessed.drop(columns=[self.__auto_params['target']])
 
         # Model
+        if (m =='xgb'):
+            model = XGBClassifier()
         if (m == 'lg'):
             model = LogisticRegression()
         
@@ -197,7 +198,7 @@ class Automate:
         # Accuracies
         accuracies = []
 
-        kf = KFold(n_splits=self.__auto_params['cv'], shuffle=True, random_state=None)
+        kf = KFold(n_splits=5, shuffle=True, random_state=None)
 
         for train_index, test_index in kf.split(self.df_start):
 
@@ -250,7 +251,7 @@ class Automate:
                 'encode_type' : random.choice(['one-hot', 'label']),
                 'scale_type' : random.choice(['none', 'std', 'min-max', 'robust']),
                 'select_type' : random.choice(['none', 'variance_thres', 'univariate', 'mi']),
-                'select_perc' : random.choice([0.4, 0.6, 0.8])
+                'select_perc' : random.choice([0.4, 0.5, 0.75, 0.9])
             }
 
             ## Params
@@ -495,10 +496,16 @@ class Automate:
 
     # Extract Results
     def save(self, filepath):
-        if (self.__auto_params['opt_method'] == 'bayesian'):
-            pip = self.result['x']
+
+        if (self.__auto_params['evaluation_type'] == 'basic'):
+
+            pip = [ 'None', 'Mean', 'One-hot', 'None', 'None', 'None']
+
         else:
-            pip = self.result[0]
+            if (self.__auto_params['opt_method'] == 'bayesian'):
+                pip = self.result['x']
+            else:
+                pip = self.result[0]
 
         # Data
         data = [
